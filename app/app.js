@@ -720,20 +720,26 @@ function assembledOrder() {
 
 /* 誤答は実在する用語だけを使う。崩した文字列を混ぜると、内容ではなく
    「形が変な選択肢を外す」ゲームになって暗記の役に立たない。
-   同じ回の用語をいちばん紛らわしい誤答として優先する。 */
+
+   最優先は questions.js に手で用意した distractors。これは問題文の5W1H
+   （誰か／何年か／どこか／なぜか／三つ答えよ…）に答えの型をそろえてある。
+   自動生成だと「誰か？」に年号が混ざり、型で消せる問題になってしまう。
+   distractors が足りないときだけ、同じ回 → 近い回の順に実答案で補う。 */
 function historyChoices(question) {
+  const authored = shuffle((question.distractors || []).slice());
   const sameLesson = shuffle(
     HISTORY_POOL.filter((item) => item.lesson === question.lesson && item.id !== question.id)
   );
   const nearby = HISTORY_POOL.filter((item) => item.lesson !== question.lesson).sort(
     (a, b) => Math.abs(a.lesson - question.lesson) - Math.abs(b.lesson - question.lesson)
   );
-  const pool = uniqueChoices([
+  const wrong = uniqueChoices([
     question.answer,
+    ...authored,
     ...sameLesson.map((item) => item.answer),
     ...nearby.map((item) => item.answer)
-  ]);
-  return shuffle(pool.slice(0, 4));
+  ]).slice(1);
+  return shuffle([question.answer, ...wrong.slice(0, 3)]);
 }
 
 function uniqueChoices(choices) {
