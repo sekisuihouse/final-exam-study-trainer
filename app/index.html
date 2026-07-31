@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>期末テスト対策</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <!-- 教科選択 -->
+      <section id="subject-view" class="view active">
+        <p class="eyebrow">Test Trainer</p>
+        <h1>教科を選ぶ</h1>
+        <div id="subject-grid" class="subject-grid"></div>
+        <p class="foot-note">進捗はこの端末のブラウザに自動保存されます。</p>
+      </section>
+
+      <!-- モード・範囲設定 -->
+      <section id="setup-view" class="view">
+        <button class="ghost-button" type="button" data-goto="subject">← 教科選択</button>
+        <p id="setup-eyebrow" class="eyebrow"></p>
+        <h1 id="setup-title"></h1>
+
+        <div id="mastery-bar" class="mastery-bar"></div>
+
+        <div class="setup-block">
+          <p class="block-label">出題形式</p>
+          <div id="mode-grid" class="mode-grid"></div>
+        </div>
+
+        <div class="setup-block">
+          <p class="block-label">
+            <span id="group-label">範囲</span>
+            <button id="group-all" class="mini-button" type="button">すべて</button>
+            <button id="group-none" class="mini-button" type="button">解除</button>
+          </p>
+          <div id="group-chips" class="chip-row"></div>
+        </div>
+
+        <div class="setup-block">
+          <p class="block-label">出題対象</p>
+          <div id="filter-chips" class="chip-row">
+            <button class="chip active" type="button" data-filter="all">すべて</button>
+            <button class="chip" type="button" data-filter="weak">苦手・間違えた問題</button>
+            <button class="chip" type="button" data-filter="new">まだ解いていない問題</button>
+            <button class="chip" type="button" data-filter="due">復習の時期がきた問題</button>
+          </div>
+        </div>
+
+        <div class="setup-block">
+          <p class="block-label">1セッションの問題数</p>
+          <div id="length-chips" class="chip-row">
+            <button class="chip" type="button" data-length="10">10問</button>
+            <button class="chip active" type="button" data-length="20">20問</button>
+            <button class="chip" type="button" data-length="40">40問</button>
+            <button class="chip" type="button" data-length="0">エンドレス</button>
+          </div>
+        </div>
+
+        <div class="setup-block">
+          <p class="block-label">学習オプション</p>
+          <label class="switch"><input id="opt-auto" type="checkbox" /><span>正解したら自動で次の問題へ</span></label>
+          <label class="switch"><input id="opt-copy" type="checkbox" /><span>間違えたら正答を書き写して覚える</span></label>
+          <label class="switch"><input id="opt-explain" type="checkbox" /><span>正解のときも解説を表示する</span></label>
+        </div>
+
+        <div class="setup-actions">
+          <button id="start-session" class="primary-button" type="button">開始</button>
+          <button id="reset-progress" class="danger-button" type="button">この教科の進捗をリセット</button>
+        </div>
+        <p id="pool-note" class="foot-note"></p>
+      </section>
+
+      <!-- 出題 -->
+      <section id="quiz-view" class="view">
+        <header class="quiz-header">
+          <button class="ghost-button" type="button" data-goto="setup">← 設定</button>
+          <div class="stats">
+            <span id="mode-label"></span>
+            <span id="score-label"></span>
+          </div>
+        </header>
+        <div class="progress-track"><div id="progress-fill" class="progress-fill"></div></div>
+
+        <article class="question-panel">
+          <p id="question-meta" class="eyebrow"></p>
+          <h2 id="question-text"></h2>
+          <p id="jp-line" class="jp-line"></p>
+          <p id="sentence-line" class="sentence-line"></p>
+          <pre id="code-block" class="code-block"></pre>
+
+          <form id="write-form" class="answer-area">
+            <textarea id="write-answer" rows="1" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="答えを入力"></textarea>
+            <button type="submit">判定</button>
+          </form>
+
+          <div id="choice-area" class="choice-area"></div>
+
+          <div id="order-area" class="order-area">
+            <div id="order-slot" class="order-slot" aria-live="polite"></div>
+            <div id="order-bank" class="order-bank"></div>
+            <div class="order-actions">
+              <button id="order-clear" class="ghost-button" type="button">やり直す</button>
+              <button id="order-submit" class="primary-button" type="button">判定</button>
+            </div>
+          </div>
+
+          <div id="result" class="result" aria-live="polite"></div>
+          <div id="explanation" class="explanation"></div>
+
+          <div id="copy-drill" class="copy-drill">
+            <p class="copy-label">正答を書き写して定着させる</p>
+            <p id="copy-target" class="copy-target"></p>
+            <input id="copy-input" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="ここに入力" />
+            <p id="copy-status" class="copy-status"></p>
+          </div>
+
+          <div class="actions">
+            <button id="show-answer" class="ghost-button" type="button">答えを見る</button>
+            <button id="next-question" class="primary-button" type="button">次の問題</button>
+          </div>
+        </article>
+
+        <p class="foot-note">キーボード: 1〜4 で選択 / Enter で判定・次へ</p>
+      </section>
+
+      <!-- セッション結果 -->
+      <section id="result-view" class="view">
+        <p class="eyebrow">Session Report</p>
+        <h1 id="report-score"></h1>
+        <div id="report-metrics" class="dashboard"></div>
+        <div id="report-missed" class="report-missed"></div>
+        <div class="setup-actions">
+          <button id="retry-missed" class="primary-button" type="button">間違えた問題だけ復習</button>
+          <button id="retry-same" class="primary-button" type="button">同じ設定でもう一度</button>
+          <button class="ghost-button" type="button" data-goto="setup">設定に戻る</button>
+        </div>
+      </section>
+    </main>
+
+    <script src="questions.js"></script>
+    <script src="english.js"></script>
+    <script src="english-drills.js"></script>
+    <script src="english-reading.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,9 @@
+.DS_Store
+.claude/
+english/
+history/
+kisopuro/
+kiso-prog2-*-main/
+url-quiz-lock-extension/
+claude-code-review-prompt.md
+test-ranges.md
