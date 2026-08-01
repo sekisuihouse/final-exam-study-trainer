@@ -19,6 +19,7 @@ const MASTERED_BOX = 3;
 const LEECH_LAPSES = 3;
 const RETRY_GAP = 3;
 const AUTO_ADVANCE_MS = 850;
+const MIN_NONZERO_RATE = Number.EPSILON * 100;
 
 /* ---------------- 問題プール ---------------- */
 
@@ -152,6 +153,10 @@ const els = {
   progressFill: document.querySelector("#progress-fill"),
   questionMeta: document.querySelector("#question-meta"),
   rateChartSvg: document.querySelector("#rate-chart-svg"),
+  newQuestionStatus: document.querySelector("#new-question-status"),
+  newQuestionTitle: document.querySelector("#new-question-title"),
+  newQuestionPrompt: document.querySelector("#new-question-prompt"),
+  newQuestionRate: document.querySelector("#new-question-rate"),
   questionText: document.querySelector("#question-text"),
   jpLine: document.querySelector("#jp-line"),
   sentenceLine: document.querySelector("#sentence-line"),
@@ -436,7 +441,7 @@ function historyProgressiveEntries(pool, setup, now) {
   let regular = ordered.filter((question) => regularIds.has(question.id));
   let currentNew = ordered.find((question) => !regularIds.has(question.id));
   let regularTotal = regular.reduce((sum, question) => sum + questionWeight(question, now), 0);
-  let rawNewRate = Math.max(0, 100 - regularTotal);
+  let rawNewRate = Math.max(MIN_NONZERO_RATE, 100 - regularTotal);
   let changed = false;
 
   /* 余りが20%を超えたら、その問題を通常問題にして次へ進む。 */
@@ -445,7 +450,7 @@ function historyProgressiveEntries(pool, setup, now) {
     regular = ordered.filter((question) => regularIds.has(question.id));
     regularTotal = regular.reduce((sum, question) => sum + questionWeight(question, now), 0);
     currentNew = ordered.find((question) => !regularIds.has(question.id));
-    rawNewRate = Math.max(0, 100 - regularTotal);
+    rawNewRate = Math.max(MIN_NONZERO_RATE, 100 - regularTotal);
     changed = true;
   }
 
@@ -553,6 +558,7 @@ function renderAppearanceChart() {
   const entries = activeAppearanceEntries();
   const svg = els.rateChartSvg;
   svg.replaceChildren();
+  renderNewQuestionStatus(entries);
   if (!entries.length) return;
 
   const ns = "http://www.w3.org/2000/svg";
@@ -599,6 +605,25 @@ function renderAppearanceChart() {
     }
     start += angle;
   });
+}
+
+function renderNewQuestionStatus(entries) {
+  if (session.subject !== "history") {
+    els.newQuestionStatus.hidden = true;
+    return;
+  }
+  const track = subjectState("history").releaseTracks?.[historyTrackKey(session.setup)];
+  const newId = track && track.currentId;
+  const question = newId && HISTORY_POOL.find((item) => item.id === newId);
+  if (!question) {
+    els.newQuestionStatus.hidden = true;
+    return;
+  }
+  const entry = entries.find((item) => item.question.id === newId);
+  els.newQuestionTitle.textContent = `${rateLabel(question)}（新規）`;
+  els.newQuestionPrompt.textContent = question.prompt.replace(/^★実出題:\s*/, "");
+  els.newQuestionRate.textContent = `出現率 ${formatAppearanceRate(entry ? entry.rate : 0)}`;
+  els.newQuestionStatus.hidden = false;
 }
 
 /* ---------------- 画面遷移 ---------------- */
