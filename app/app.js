@@ -152,7 +152,6 @@ const els = {
   progressFill: document.querySelector("#progress-fill"),
   questionMeta: document.querySelector("#question-meta"),
   rateChartSvg: document.querySelector("#rate-chart-svg"),
-  rateChartLegend: document.querySelector("#rate-chart-legend"),
   questionText: document.querySelector("#question-text"),
   jpLine: document.querySelector("#jp-line"),
   sentenceLine: document.querySelector("#sentence-line"),
@@ -504,15 +503,22 @@ function activeAppearanceEntries() {
     ? historyProgressiveEntries(pool, session.setup, now)
     : pool.map((question) => ({ question, weight: questionWeight(question, now) }));
   const total = entries.reduce((sum, item) => sum + item.weight, 0);
+  const track = session.subject === "history"
+    ? subjectState("history").releaseTracks?.[historyTrackKey(session.setup)]
+    : null;
   return entries
-    .map((item) => ({ ...item, rate: total > 0 ? (item.weight / total) * 100 : 0 }))
+    .map((item) => ({
+      ...item,
+      rate: total > 0 ? (item.weight / total) * 100 : 0,
+      isNew: Boolean(track && track.currentId === item.question.id)
+    }))
     .filter((item) => item.rate > 0)
     .sort((a, b) => b.rate - a.rate);
 }
 
-function piePoint(angle) {
+function piePoint(angle, radius = 50) {
   const radians = angle * Math.PI / 180;
-  return [50 + 50 * Math.cos(radians), 50 + 50 * Math.sin(radians)];
+  return [50 + radius * Math.cos(radians), 50 + radius * Math.sin(radians)];
 }
 
 function rateLabel(question) {
@@ -520,18 +526,21 @@ function rateLabel(question) {
   return question.groupTitle || question.group || question.id;
 }
 
+function chartLabel(question) {
+  const text = String(question.answer || question.prompt || "問題").replace(/[「」『』]/g, "");
+  return text.length > 11 ? `${text.slice(0, 10)}…` : text;
+}
+
 function renderAppearanceChart() {
   const entries = activeAppearanceEntries();
   const svg = els.rateChartSvg;
-  const legend = els.rateChartLegend;
   svg.replaceChildren();
-  legend.replaceChildren();
   if (!entries.length) return;
 
   const ns = "http://www.w3.org/2000/svg";
   let start = -90;
   entries.forEach((item, index) => {
-    const color = `hsl(${(index * 137.508 + 164) % 360} 58% 43%)`;
+    const color = item.isNew ? "#d1603d" : `hsl(${(index * 137.508 + 164) % 360} 58% 43%)`;
     const angle = item.rate * 3.6;
     const path = document.createElementNS(ns, "path");
     if (angle >= 359.999) {
@@ -546,18 +555,31 @@ function renderAppearanceChart() {
     path.setAttribute("stroke-width", "0.7");
     path.setAttribute("aria-label", `${rateLabel(item.question)} ${item.rate.toFixed(1)}%`);
     svg.appendChild(path);
-    start += angle;
 
-    const row = document.createElement("li");
-    row.title = item.question.prompt;
-    const swatch = document.createElement("i");
-    swatch.style.background = color;
-    const name = document.createElement("span");
-    name.textContent = `${rateLabel(item.question)}　${item.question.prompt}`;
-    const percent = document.createElement("strong");
-    percent.textContent = `${item.rate.toFixed(item.rate < 1 ? 1 : 0)}%`;
-    row.append(swatch, name, percent);
-    legend.appendChild(row);
+    /* 大きな割合と新規問題だけを円の中に直接表示する。 */
+    if (item.rate >= 12 || item.isNew) {
+      const [labelX, labelY] = piePoint(start + angle / 2, item.rate >= 25 ? 27 : 34);
+      const text = document.createElementNS(ns, "text");
+      text.setAttribute("x", labelX);
+      text.setAttribute("y", labelY - 2.5);
+      text.setAttribute("fill", "white");
+      text.setAttribute("font-size", item.rate >= 25 ? "4.2" : "3.4");
+      text.setAttribute("font-weight", "800");
+      text.setAttribute("text-anchor", "middle");
+      text.setAttribute("paint-order", "stroke");
+      text.setAttribute("stroke", "rgba(0,0,0,.28)");
+      text.setAttribute("stroke-width", "0.7");
+      const first = document.createElementNS(ns, "tspan");
+      first.setAttribute("x", labelX);
+      first.textContent = `${item.isNew ? "新規・" : ""}${chartLabel(item.question)}`;
+      const second = document.createElementNS(ns, "tspan");
+      second.setAttribute("x", labelX);
+      second.setAttribute("dy", "4.2");
+      second.textContent = `${item.rate.toFixed(item.rate < 1 ? 1 : 0)}%`;
+      text.append(first, second);
+      svg.appendChild(text);
+    }
+    start += angle;
   });
 }
 
