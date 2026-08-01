@@ -381,7 +381,7 @@ function poolFor(subjectKey, setup) {
   });
 }
 
-/* 正解5回・正答率80%に届くまでは、早く出題頻度を落とさない。
+/* 正解3回に届くまでは、早く出題頻度を落とさない。
    条件を満たした問題も基準の約10%で残し、忘却チェックを続ける。 */
 function questionWeight(question, now) {
   const stats = statsFor(question);
@@ -389,7 +389,7 @@ function questionWeight(question, now) {
   const masteredWeight = learningWeight * 0.1;
   if (!stats.seen) return learningWeight;
   const accuracy = stats.correct / stats.seen;
-  const readyToReduce = stats.correct >= 5 && accuracy >= 0.8;
+  const readyToReduce = stats.correct >= 3;
   if (readyToReduce) return masteredWeight;
 
   /* 苦手・期限超過は少し増やすが、少数回の正解だけでは下げない。 */
