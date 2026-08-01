@@ -381,7 +381,7 @@ function poolFor(subjectKey, setup) {
   });
 }
 
-/* 正解3回に届くまでは、早く出題頻度を落とさない。
+/* 正解3回・正答率70%に届くまでは、早く出題頻度を落とさない。
    条件を満たした問題も基準の約10%で残し、忘却チェックを続ける。 */
 function questionWeight(question, now) {
   const stats = statsFor(question);
@@ -389,7 +389,7 @@ function questionWeight(question, now) {
   const masteredWeight = learningWeight * 0.1;
   if (!stats.seen) return learningWeight;
   const accuracy = stats.correct / stats.seen;
-  const readyToReduce = stats.correct >= 3;
+  const readyToReduce = stats.correct >= 3 && accuracy >= 0.7;
   if (readyToReduce) return masteredWeight;
 
   /* 苦手・期限超過は少し増やすが、少数回の正解だけでは下げない。 */
@@ -485,7 +485,11 @@ function drawQuestions(pool, count, subjectKey = currentSubject, setup = setupOf
         break;
       }
     }
-    picked.push(remaining[index].question);
+    /* 画面で見せる「今回の出現率」。選択直前の候補全体に占める割合。 */
+    picked.push({
+      ...remaining[index].question,
+      appearanceRate: total > 0 ? (remaining[index].weight / total) * 100 : 0
+    });
     remaining.splice(index, 1);
   }
   return picked;
@@ -672,7 +676,10 @@ function renderQuestion() {
   els.writeAnswer.value = "";
   els.showAnswer.disabled = false;
 
-  els.questionMeta.textContent = `${current.groupTitle} ・ ${TYPE_LABELS[current.type] || "問題"}`;
+  const appearance = Number.isFinite(current.appearanceRate)
+    ? ` ・ 今回の出現率 ${current.appearanceRate.toFixed(current.appearanceRate < 1 ? 1 : 0)}%`
+    : "";
+  els.questionMeta.textContent = `${current.groupTitle} ・ ${TYPE_LABELS[current.type] || "問題"}${appearance}`;
   els.questionText.textContent = current.prompt;
 
   setBlock(els.jpLine, current.jp || "");
