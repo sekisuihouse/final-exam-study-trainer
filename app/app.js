@@ -189,7 +189,7 @@ let autoAdvanceTimer = null;
 /* ---------------- 保存 ---------------- */
 
 function emptySubjectState() {
-  return { stats: {}, totalCorrect: 0, totalSeen: 0 };
+  return { stats: {}, totalCorrect: 0, totalSeen: 0, releaseTracks: {} };
 }
 
 function defaultSettings() {
@@ -400,9 +400,78 @@ function questionWeight(question, now) {
   return learningWeight * overdueBoost * errorBoost * leechBoost;
 }
 
-function drawQuestions(pool, count) {
+/* 歴史は第1回から一問ずつ新規問題を開放する。
+   通常問題の出現率の合計を100%から引いた残りを「現在の新規1問」に割り当て、
+   20%を超えたら通常問題へ移して次の問題を新規にする。新規の間は記録した率を
+   下げないので、一度出始めた問題が正解だけで急に消えることはない。 */
+function historyTrackKey(setup) {
+  const mode = modeOf("history", setup.mode);
+  const kind = mode.actualOnly ? "past" : mode.historyKinds ? mode.historyKinds.join("-") : "all";
+  return `${kind}:${setup.groups.slice().sort((a, b) => Number(a) - Number(b)).join(",")}`;
+}
+
+function historyProgressiveEntries(pool, setup, now) {
+  const ordered = pool.slice().sort((a, b) => a.lesson - b.lesson || a.id.localeCompare(b.id));
+  if (!ordered.length) return [];
+
+  const store = subjectState("history");
+  if (!store.releaseTracks) store.releaseTracks = {};
+  const key = historyTrackKey(setup);
+  const track = store.releaseTracks[key] || { regularIds: [], currentId: null, currentRate: 0 };
+  store.releaseTracks[key] = track;
+
+  const availableIds = new Set(ordered.map((question) => question.id));
+  const regularIds = new Set(track.regularIds.filter((id) => availableIds.has(id)));
+  let regular = ordered.filter((question) => regularIds.has(question.id));
+  let currentNew = ordered.find((question) => !regularIds.has(question.id));
+  let regularTotal = regular.reduce((sum, question) => sum + questionWeight(question, now), 0);
+  let rawNewRate = Math.max(0, 100 - regularTotal);
+  let changed = false;
+
+  /* 余りが20%を超えたら、その問題を通常問題にして次へ進む。 */
+  while (currentNew && rawNewRate > 20) {
+    regularIds.add(currentNew.id);
+    regular = ordered.filter((question) => regularIds.has(question.id));
+    regularTotal = regular.reduce((sum, question) => sum + questionWeight(question, now), 0);
+    currentNew = ordered.find((question) => !regularIds.has(question.id));
+    rawNewRate = Math.max(0, 100 - regularTotal);
+    changed = true;
+  }
+
+  if (currentNew) {
+    if (track.currentId !== currentNew.id) {
+      track.currentId = currentNew.id;
+      track.currentRate = rawNewRate;
+      changed = true;
+    } else if (rawNewRate > track.currentRate) {
+      track.currentRate = rawNewRate;
+      changed = true;
+    }
+  } else if (track.currentId || track.currentRate) {
+    track.currentId = null;
+    track.currentRate = 0;
+    changed = true;
+  }
+
+  track.regularIds = ordered.filter((question) => regularIds.has(question.id)).map((question) => question.id);
+  if (changed) saveState();
+
+  if (!currentNew) return regular.map((question) => ({ question, weight: questionWeight(question, now) }));
+
+  /* 新規問題の率を固定し、残りの率を通常問題へ比例配分する。 */
+  const newRate = Math.min(100, Math.max(0, track.currentRate));
+  const normalScale = regularTotal > 0 ? Math.max(0, 100 - newRate) / regularTotal : 0;
+  return [
+    ...regular.map((question) => ({ question, weight: questionWeight(question, now) * normalScale })),
+    { question: currentNew, weight: newRate }
+  ].filter((item) => item.weight > 0);
+}
+
+function drawQuestions(pool, count, subjectKey = currentSubject, setup = setupOf(subjectKey)) {
   const now = Date.now();
-  const remaining = pool.map((question) => ({ question, weight: questionWeight(question, now) }));
+  const remaining = subjectKey === "history"
+    ? historyProgressiveEntries(pool, setup, now)
+    : pool.map((question) => ({ question, weight: questionWeight(question, now) }));
   const picked = [];
   const limit = Math.min(count, remaining.length);
   for (let n = 0; n < limit; n += 1) {
@@ -532,7 +601,7 @@ function startSession(options = {}) {
   if (!options.queue && pool.length === 0) return;
 
   const length = setup.length > 0 ? setup.length : 10;
-  const queue = options.queue ? options.queue.slice() : drawQuestions(pool, length);
+  const queue = options.queue ? options.queue.slice() : drawQuestions(pool, length, currentSubject, setup);
   if (!queue.length) return;
 
   session = {
@@ -557,7 +626,7 @@ function refillIfNeeded() {
   const pool = poolFor(session.subject, session.setup).filter(
     (question) => !session.queue.slice(session.index).some((queued) => queued.id === question.id)
   );
-  if (pool.length) session.queue = session.queue.concat(drawQuestions(pool, Math.min(10, pool.length)));
+  if (pool.length) session.queue = session.queue.concat(drawQuestions(pool, Math.min(10, pool.length), session.subject, session.setup));
 }
 
 function finishSession() {
