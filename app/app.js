@@ -383,15 +383,18 @@ function poolFor(subjectKey, setup) {
 }
 
 /* 正解3回・正答率70%に届くまでは、早く出題頻度を落とさない。
-   条件を満たした問題も基準の約10%で残し、忘却チェックを続ける。 */
+   条件を満たすと基準の約10%になり、その後の正解ごとにも連続的に下がる。
+   数学的には0にならないため、十分に定着した問題もごく稀に復習へ回る。 */
 function questionWeight(question, now) {
   const stats = statsFor(question);
   const learningWeight = 12;
-  const masteredWeight = learningWeight * 0.1;
   if (!stats.seen) return learningWeight;
   const accuracy = stats.correct / stats.seen;
   const readyToReduce = stats.correct >= 3 && accuracy >= 0.7;
-  if (readyToReduce) return masteredWeight;
+  if (readyToReduce) {
+    const extraCorrect = stats.correct - 3;
+    return learningWeight * 0.1 * Math.pow(0.65, extraCorrect);
+  }
 
   /* 苦手・期限超過は少し増やすが、少数回の正解だけでは下げない。 */
   const overdueHours = Math.max(0, (now - stats.due) / HOUR);
@@ -422,7 +425,14 @@ function historyProgressiveEntries(pool, setup, now) {
   store.releaseTracks[key] = track;
 
   const availableIds = new Set(ordered.map((question) => question.id));
-  const regularIds = new Set(track.regularIds.filter((id) => availableIds.has(id)));
+  /* 一度でも回答した問題は、モードをまたいでも新規扱いへ戻さない。 */
+  const answeredIds = ordered
+    .filter((question) => statsFor(question).seen > 0)
+    .map((question) => question.id);
+  const regularIds = new Set([
+    ...track.regularIds.filter((id) => availableIds.has(id)),
+    ...answeredIds
+  ]);
   let regular = ordered.filter((question) => regularIds.has(question.id));
   let currentNew = ordered.find((question) => !regularIds.has(question.id));
   let regularTotal = regular.reduce((sum, question) => sum + questionWeight(question, now), 0);
@@ -526,6 +536,14 @@ function rateLabel(question) {
   return question.groupTitle || question.group || question.id;
 }
 
+function formatAppearanceRate(rate) {
+  if (!Number.isFinite(rate) || rate <= 0) return "0%";
+  if (rate >= 10) return `${rate.toFixed(0)}%`;
+  if (rate >= 1) return `${rate.toFixed(1)}%`;
+  if (rate >= 0.01) return `${rate.toPrecision(2)}%`;
+  return `${rate.toExponential(1)}%`;
+}
+
 function chartLabel(question) {
   const text = String(question.answer || question.prompt || "問題").replace(/[「」『』]/g, "");
   return text.length > 11 ? `${text.slice(0, 10)}…` : text;
@@ -553,7 +571,7 @@ function renderAppearanceChart() {
     path.setAttribute("fill", color);
     path.setAttribute("stroke", "var(--panel)");
     path.setAttribute("stroke-width", "0.7");
-    path.setAttribute("aria-label", `${rateLabel(item.question)} ${item.rate.toFixed(1)}%`);
+    path.setAttribute("aria-label", `${rateLabel(item.question)} ${formatAppearanceRate(item.rate)}`);
     svg.appendChild(path);
 
     /* 大きな割合と新規問題だけを円の中に直接表示する。 */
@@ -575,7 +593,7 @@ function renderAppearanceChart() {
       const second = document.createElementNS(ns, "tspan");
       second.setAttribute("x", labelX);
       second.setAttribute("dy", "4.2");
-      second.textContent = `${item.rate.toFixed(item.rate < 1 ? 1 : 0)}%`;
+      second.textContent = formatAppearanceRate(item.rate);
       text.append(first, second);
       svg.appendChild(text);
     }
@@ -765,7 +783,7 @@ function renderQuestion() {
   els.showAnswer.disabled = false;
 
   const appearance = Number.isFinite(current.appearanceRate)
-    ? ` ・ 今回の出現率 ${current.appearanceRate.toFixed(current.appearanceRate < 1 ? 1 : 0)}%`
+    ? ` ・ 今回の出現率 ${formatAppearanceRate(current.appearanceRate)}`
     : "";
   els.questionMeta.textContent = `${current.groupTitle} ・ ${TYPE_LABELS[current.type] || "問題"}${appearance}`;
   els.questionText.textContent = current.prompt;
