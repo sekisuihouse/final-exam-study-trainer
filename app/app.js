@@ -151,6 +151,8 @@ const els = {
   scoreLabel: document.querySelector("#score-label"),
   progressFill: document.querySelector("#progress-fill"),
   questionMeta: document.querySelector("#question-meta"),
+  rateChartSvg: document.querySelector("#rate-chart-svg"),
+  rateChartLegend: document.querySelector("#rate-chart-legend"),
   questionText: document.querySelector("#question-text"),
   jpLine: document.querySelector("#jp-line"),
   sentenceLine: document.querySelector("#sentence-line"),
@@ -495,6 +497,70 @@ function drawQuestions(pool, count, subjectKey = currentSubject, setup = setupOf
   return picked;
 }
 
+function activeAppearanceEntries() {
+  const pool = poolFor(session.subject, session.setup);
+  const now = Date.now();
+  const entries = session.subject === "history"
+    ? historyProgressiveEntries(pool, session.setup, now)
+    : pool.map((question) => ({ question, weight: questionWeight(question, now) }));
+  const total = entries.reduce((sum, item) => sum + item.weight, 0);
+  return entries
+    .map((item) => ({ ...item, rate: total > 0 ? (item.weight / total) * 100 : 0 }))
+    .filter((item) => item.rate > 0)
+    .sort((a, b) => b.rate - a.rate);
+}
+
+function piePoint(angle) {
+  const radians = angle * Math.PI / 180;
+  return [50 + 50 * Math.cos(radians), 50 + 50 * Math.sin(radians)];
+}
+
+function rateLabel(question) {
+  if (question.subject === "history") return `第${question.lesson}回・問${Number(question.id.slice(-3))}`;
+  return question.groupTitle || question.group || question.id;
+}
+
+function renderAppearanceChart() {
+  const entries = activeAppearanceEntries();
+  const svg = els.rateChartSvg;
+  const legend = els.rateChartLegend;
+  svg.replaceChildren();
+  legend.replaceChildren();
+  if (!entries.length) return;
+
+  const ns = "http://www.w3.org/2000/svg";
+  let start = -90;
+  entries.forEach((item, index) => {
+    const color = `hsl(${(index * 137.508 + 164) % 360} 58% 43%)`;
+    const angle = item.rate * 3.6;
+    const path = document.createElementNS(ns, "path");
+    if (angle >= 359.999) {
+      path.setAttribute("d", "M 50 0 A 50 50 0 1 1 49.99 0 Z");
+    } else {
+      const [startX, startY] = piePoint(start);
+      const [endX, endY] = piePoint(start + angle);
+      path.setAttribute("d", `M 50 50 L ${startX} ${startY} A 50 50 0 ${angle > 180 ? 1 : 0} 1 ${endX} ${endY} Z`);
+    }
+    path.setAttribute("fill", color);
+    path.setAttribute("stroke", "var(--panel)");
+    path.setAttribute("stroke-width", "0.7");
+    path.setAttribute("aria-label", `${rateLabel(item.question)} ${item.rate.toFixed(1)}%`);
+    svg.appendChild(path);
+    start += angle;
+
+    const row = document.createElement("li");
+    row.title = item.question.prompt;
+    const swatch = document.createElement("i");
+    swatch.style.background = color;
+    const name = document.createElement("span");
+    name.textContent = `${rateLabel(item.question)}　${item.question.prompt}`;
+    const percent = document.createElement("strong");
+    percent.textContent = `${item.rate.toFixed(item.rate < 1 ? 1 : 0)}%`;
+    row.append(swatch, name, percent);
+    legend.appendChild(row);
+  });
+}
+
 /* ---------------- 画面遷移 ---------------- */
 
 function showView(name) {
@@ -681,6 +747,7 @@ function renderQuestion() {
     : "";
   els.questionMeta.textContent = `${current.groupTitle} ・ ${TYPE_LABELS[current.type] || "問題"}${appearance}`;
   els.questionText.textContent = current.prompt;
+  renderAppearanceChart();
 
   setBlock(els.jpLine, current.jp || "");
   setBlock(els.codeBlock, current.code || "");
@@ -969,6 +1036,7 @@ function finishAnswer(ok, revealed = false) {
   recordAnswer(current, ok);
   session.answeredCount += 1;
   if (ok) session.correctCount += 1;
+  renderAppearanceChart();
 
   if (!ok) {
     if (!session.missed.some((item) => item.id === current.id)) session.missed.push(current);
