@@ -381,17 +381,23 @@ function poolFor(subjectKey, setup) {
   });
 }
 
-/* 未学習と期限切れを優先しつつ、定着済みも0にはしない。 */
+/* 正解5回・正答率80%に届くまでは、早く出題頻度を落とさない。
+   条件を満たした問題も基準の約10%で残し、忘却チェックを続ける。 */
 function questionWeight(question, now) {
   const stats = statsFor(question);
-  if (!stats.seen) return 14;
+  const learningWeight = 12;
+  const masteredWeight = learningWeight * 0.1;
+  if (!stats.seen) return learningWeight;
   const accuracy = stats.correct / stats.seen;
+  const readyToReduce = stats.correct >= 5 && accuracy >= 0.8;
+  if (readyToReduce) return masteredWeight;
+
+  /* 苦手・期限超過は少し増やすが、少数回の正解だけでは下げない。 */
   const overdueHours = Math.max(0, (now - stats.due) / HOUR);
-  const dueBoost = stats.due <= now ? 4 + Math.min(6, overdueHours * 0.5) : 0.5;
-  const boxBoost = (MAX_BOX - Math.min(MAX_BOX, stats.box)) / 2 + 0.6;
-  const accuracyBoost = 0.6 + (1 - accuracy) * 3;
-  const leechBoost = stats.lapses >= LEECH_LAPSES ? 1.8 : 1;
-  return Math.max(0.3, (dueBoost * boxBoost * accuracyBoost * leechBoost) / 4);
+  const overdueBoost = stats.due <= now ? 1 + Math.min(0.35, overdueHours * 0.03) : 1;
+  const errorBoost = 1 + (1 - accuracy) * 0.8;
+  const leechBoost = stats.lapses >= LEECH_LAPSES ? 1.25 : 1;
+  return learningWeight * overdueBoost * errorBoost * leechBoost;
 }
 
 function drawQuestions(pool, count) {
