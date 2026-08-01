@@ -19,7 +19,8 @@ const MASTERED_BOX = 3;
 const LEECH_LAPSES = 3;
 const RETRY_GAP = 3;
 const AUTO_ADVANCE_MS = 850;
-const MIN_NONZERO_RATE = Number.EPSILON * 100;
+/* 通常問題は最大80%まで。残り20%以上を現在の新規1問に確保する。 */
+const REGULAR_RATE_CAP = 80;
 
 /* ---------------- 問題プール ---------------- */
 
@@ -441,7 +442,8 @@ function historyProgressiveEntries(pool, setup, now) {
   let regular = ordered.filter((question) => regularIds.has(question.id));
   let currentNew = ordered.find((question) => !regularIds.has(question.id));
   let regularTotal = regular.reduce((sum, question) => sum + questionWeight(question, now), 0);
-  let rawNewRate = Math.max(MIN_NONZERO_RATE, 100 - regularTotal);
+  /* 重みは％ではないため、通常問題は80%の枠に収めてから残りを新規へ渡す。 */
+  let rawNewRate = 100 - Math.min(REGULAR_RATE_CAP, regularTotal);
   let changed = false;
 
   /* 余りが20%を超えたら、その問題を通常問題にして次へ進む。 */
@@ -450,7 +452,7 @@ function historyProgressiveEntries(pool, setup, now) {
     regular = ordered.filter((question) => regularIds.has(question.id));
     regularTotal = regular.reduce((sum, question) => sum + questionWeight(question, now), 0);
     currentNew = ordered.find((question) => !regularIds.has(question.id));
-    rawNewRate = Math.max(MIN_NONZERO_RATE, 100 - regularTotal);
+    rawNewRate = 100 - Math.min(REGULAR_RATE_CAP, regularTotal);
     changed = true;
   }
 
