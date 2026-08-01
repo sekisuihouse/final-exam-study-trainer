@@ -10827,6 +10827,19 @@ const HISTORY_LESSONS = [
   }
 ];
 
+/* 単語モード用の分類。
+   年号・理由説明・複数項目を答える問題は外し、資料に出る主要な概念・制度・
+   人物名などを一語（または固有名詞）で答える問題を残す。 */
+function historyAnswerKind(question) {
+  const answer = String(question.answer || "").trim();
+  const prompt = String(question.prompt || "");
+  const isNumberOrDate = /[0-9０-９]|[％%]|(?:年|世紀|日|か月|ヶ月|年間)/.test(answer);
+  const looksLikeExplanation = /(?:、|，|→|ため|こと|一方|ではなく|によって|という問い|か、)/.test(answer);
+  const asksForName = /(?:誰|人物|人名|何という|何と呼ば|名称|語|概念|制度|法律|思想|運動|技術|様式|著書|組織|大学|神|星座|暦|方式|産業|装置|器具|場所|店|都市|王|皇帝|哲学者|数学者|建築家|実業家|医師)/.test(prompt);
+  const compactAnswer = answer.length <= 18 && !/[。！？]/.test(answer);
+  return !isNumberOrDate && !looksLikeExplanation && (asksForName || compactAnswer) ? "term" : "explanation";
+}
+
 const HISTORY_QUESTIONS = HISTORY_LESSONS.flatMap((lesson) =>
   lesson.questions.map((question) => ({
     id: `h${String(lesson.lesson).padStart(2, "0")}-${String(question.number).padStart(3, "0")}`,
@@ -10839,7 +10852,8 @@ const HISTORY_QUESTIONS = HISTORY_LESSONS.flatMap((lesson) =>
     /* 4択の誤答候補。問題文の5W1H・答えの型に合わせて手で用意してある。 */
     distractors: question.distractors || [],
     explanation: question.source ? `出典: ${question.source}` : "",
-    actual: question.actual
+    actual: question.actual,
+    historyKind: historyAnswerKind(question)
   }))
 );
 

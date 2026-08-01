@@ -54,7 +54,7 @@ const SUBJECTS = {
   history: {
     label: "歴史",
     eyebrow: "History",
-    blurb: "第1〜15回の用語。書き込みと4択で確実に固める。",
+    blurb: "第1〜15回を、書き込み・4択・単語・過去問で確実に固める。",
     groupLabel: "出題する回",
     pool: HISTORY_POOL,
     groupOrder: (a, b) => Number(a) - Number(b),
@@ -62,7 +62,9 @@ const SUBJECTS = {
     modes: [
       { key: "mix", label: "ミックス", desc: "書き込みと4択を交ぜる。思い出す力と見分ける力を同時に鍛える。" },
       { key: "write", label: "書き込み", desc: "自力で思い出す。かな入力・軽い誤字も正解にする。" },
-      { key: "choice", label: "4択", desc: "選ぶだけ。移動中や直前の総ざらい向き。" }
+      { key: "choice", label: "4択", desc: "選ぶだけ。移動中や直前の総ざらい向き。" },
+      { key: "term", label: "単語・人物", desc: "第1〜15回の主要用語・概念・人物名など、単語で答える問題だけを練習。", historyKinds: ["term"] },
+      { key: "past", label: "過去問だけ", desc: "資料中の★実出題だけを集中的に練習。書き込みと4択で出題。", actualOnly: true }
     ]
   },
   english: {
@@ -362,6 +364,8 @@ function poolFor(subjectKey, setup) {
   return SUBJECTS[subjectKey].pool.filter((question) => {
     if (mode.parts && !mode.parts.includes(question.part)) return false;
     if (mode.types && !mode.types.includes(question.type)) return false;
+    if (mode.historyKinds && !mode.historyKinds.includes(question.historyKind)) return false;
+    if (mode.actualOnly && !question.actual) return false;
     if (!setup.groups.includes(question.group)) return false;
     const stats = statsFor(question);
     if (setup.filter === "new") return stats.seen === 0;
@@ -553,7 +557,7 @@ function finishSession() {
 
 function renderKindOf(question) {
   if (question.subject === "history") {
-    if (session.mode === "write") return "input";
+    if (session.mode === "write" || session.mode === "term") return "input";
     if (session.mode === "choice") return "choice";
     return Math.random() < 0.5 ? "input" : "choice";
   }
