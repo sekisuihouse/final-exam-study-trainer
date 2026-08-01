@@ -54,7 +54,7 @@ const SUBJECTS = {
   history: {
     label: "歴史",
     eyebrow: "History",
-    blurb: "第1〜15回を、書き込み・4択・単語・過去問で確実に固める。",
+    blurb: "第1〜15回の厳選問題を、書き込み・4択・単語・過去問で固める。",
     groupLabel: "出題する回",
     pool: HISTORY_POOL,
     groupOrder: (a, b) => Number(a) - Number(b),

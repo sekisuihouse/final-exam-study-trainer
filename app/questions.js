@@ -10840,7 +10840,7 @@ function historyAnswerKind(question) {
   return !isNumberOrDate && !looksLikeExplanation && (asksForName || compactAnswer) ? "term" : "explanation";
 }
 
-const HISTORY_QUESTIONS = HISTORY_LESSONS.flatMap((lesson) =>
+const ALL_HISTORY_QUESTIONS = HISTORY_LESSONS.flatMap((lesson) =>
   lesson.questions.map((question) => ({
     id: `h${String(lesson.lesson).padStart(2, "0")}-${String(question.number).padStart(3, "0")}`,
     subject: "history",
@@ -10856,6 +10856,32 @@ const HISTORY_QUESTIONS = HISTORY_LESSONS.flatMap((lesson) =>
     historyKind: historyAnswerKind(question)
   }))
 );
+
+/* 期末対策用の厳選問題。
+   ★実出題は全て残し、各回の中心概念・人物・制度・因果関係を優先した。
+   課題の事務的な数値、枝葉の年号、同じ趣旨を問う重複問題は外している。 */
+const HISTORY_TEST_FOCUSED_NUMBERS = {
+  1: [4, 5, 7, 8, 10, 11, 14, 18, 21, 22],
+  2: [1, 3, 5, 6, 7, 8, 15, 19, 23, 36],
+  3: [3, 4, 20, 21, 31, 40, 41, 42, 46, 52],
+  4: [3, 6, 9, 11, 22, 24, 25, 26, 32, 33],
+  5: [1, 2, 6, 7, 16, 19, 20, 21, 24, 36],
+  6: [8, 11, 13, 17, 23, 25, 30, 31, 47, 56],
+  7: [1, 2, 4, 6, 10, 11, 12, 17, 30, 34],
+  8: [5, 6, 15, 16, 19],
+  9: [7, 8, 9, 12, 13, 21, 27, 29, 30, 36],
+  10: [2, 3, 5, 7, 8, 15, 16, 23, 25, 43],
+  11: [4, 6, 7, 8, 11, 16, 20, 31, 33, 41],
+  12: [4, 5, 6, 10, 24, 29, 38, 39, 41, 42],
+  13: [1, 2, 12, 13, 19, 30, 31, 34, 35, 40],
+  14: [2, 7, 12, 20, 23, 30, 31, 33, 36, 41],
+  15: [1, 4, 5, 6, 7, 9, 10, 15, 19, 22]
+};
+
+const HISTORY_QUESTIONS = ALL_HISTORY_QUESTIONS.filter((question) => {
+  const number = Number(question.id.slice(-3));
+  return HISTORY_TEST_FOCUSED_NUMBERS[question.lesson].includes(number);
+});
 
 const PROGRAMMING_QUESTIONS = [
   {
