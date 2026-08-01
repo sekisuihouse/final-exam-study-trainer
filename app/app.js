@@ -63,8 +63,10 @@ const SUBJECTS = {
       { key: "mix", label: "ミックス", desc: "書き込みと4択を交ぜる。思い出す力と見分ける力を同時に鍛える。" },
       { key: "write", label: "書き込み", desc: "自力で思い出す。かな入力・軽い誤字も正解にする。" },
       { key: "choice", label: "4択", desc: "選ぶだけ。移動中や直前の総ざらい向き。" },
-      { key: "term", label: "単語・人物", desc: "第1〜15回の主要用語・概念・人物名など、単語で答える問題だけを練習。", historyKinds: ["term"] },
-      { key: "past", label: "過去問だけ", desc: "資料中の★実出題だけを集中的に練習。書き込みと4択で出題。", actualOnly: true }
+      { key: "term-write", label: "単語・人物｜書き込み", desc: "主要用語・概念・人物名だけを、自力で入力して練習。", historyKinds: ["term"], historyRender: "input" },
+      { key: "term-choice", label: "単語・人物｜4択", desc: "主要用語・概念・人物名だけを、4択でテンポよく練習。", historyKinds: ["term"], historyRender: "choice" },
+      { key: "past-write", label: "過去問だけ｜書き込み", desc: "資料中の★実出題だけを、自力で入力して練習。", actualOnly: true, historyRender: "input" },
+      { key: "past-choice", label: "過去問だけ｜4択", desc: "資料中の★実出題だけを、4択で確認。", actualOnly: true, historyRender: "choice" }
     ]
   },
   english: {
@@ -296,8 +298,12 @@ function setupOf(subjectKey) {
   const base = defaultSetup(subjectKey);
   if (!saved) return base;
   const valid = groupsOf(subjectKey);
+  const legacyHistoryMode = subjectKey === "history"
+    ? { term: "term-write", past: "past-choice" }[saved.mode]
+    : undefined;
+  const requestedMode = legacyHistoryMode || saved.mode;
   return {
-    mode: SUBJECTS[subjectKey].modes.some((m) => m.key === saved.mode) ? saved.mode : base.mode,
+    mode: SUBJECTS[subjectKey].modes.some((m) => m.key === requestedMode) ? requestedMode : base.mode,
     groups: Array.isArray(saved.groups) ? saved.groups.filter((g) => valid.includes(g)) : base.groups,
     filter: saved.filter || base.filter,
     length: typeof saved.length === "number" ? saved.length : base.length
@@ -557,7 +563,9 @@ function finishSession() {
 
 function renderKindOf(question) {
   if (question.subject === "history") {
-    if (session.mode === "write" || session.mode === "term") return "input";
+    const mode = modeOf("history", session.mode);
+    if (mode.historyRender) return mode.historyRender;
+    if (session.mode === "write") return "input";
     if (session.mode === "choice") return "choice";
     return Math.random() < 0.5 ? "input" : "choice";
   }
